@@ -150,7 +150,10 @@ function findUnsent(callback) {
                     }
 
                     // Find "normal" campaigns. Ignore RSS and drip campaigns at this point
-                    let query = 'SELECT `id`, `list`, `segment` FROM `campaigns` WHERE `status`=? AND (`scheduled` IS NULL OR `scheduled` <= NOW()) AND `type` IN (?, ?) LIMIT 1';
+                    // Support multiple campaigns in parallel based on configuration
+                    let maxCampaigns = Number(config.queue.maxParallelCampaigns) || 0;
+                    let limitClause = maxCampaigns > 0 ? ` LIMIT ${maxCampaigns}` : '';
+                    let query = `SELECT \`id\`, \`list\`, \`segment\` FROM \`campaigns\` WHERE \`status\`=? AND (\`scheduled\` IS NULL OR \`scheduled\` <= NOW()) AND \`type\` IN (?, ?)${limitClause}`;
                     connection.query(query, [2, 1, 3], (err, rows) => {
                         connection.release();
                         if (err) {

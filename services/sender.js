@@ -177,7 +177,7 @@ function findUnsent(callback) {
                             segments.getQuery(segmentId, 'subscription', next);
                         };
 
-                        getSegmentQuery(campaign.segment, (err, queryData) => {
+                        gaetSegmentQuery(campaign.segment, (err, queryData) => {
                             if (err) {
                                 return done(err);
                             }

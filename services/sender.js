@@ -144,6 +144,86 @@ function findUnsent(callback) {
                     });
                 };
 
+                // Helper function to process a single campaign
+                function handleCampaign(campaign, callback) {
+                    let getSegmentQuery = (segmentId, next) => {
+                        segmentId = Number(segmentId);
+                        if (!segmentId) {
+                            return next(null, {
+                                where: '',
+                                values: []
+                            });
+                        }
+
+                        segments.getQuery(segmentId, 'subscription', next);
+                    };
+
+                    getSegmentQuery(campaign.segment, (err, queryData) => {
+                        if (err) {
+                            return callback(err);
+                        }
+
+                        db.getConnection((err, connection) => {
+                            if (err) {
+                                return callback(err);
+                            }
+
+                            // TODO: Add support for localized sending time. In this case campaign messages are
+                            //       not sent before receiver's local time reaches defined time
+                            // SELECT * FROM subscription__1 LEFT JOIN tzoffset ON tzoffset.tz=subscription__1.tz WHERE NOW() + INTERVAL IFNULL(`offset`,0) MINUTE >= localtime
+
+                            let query;
+                            let values;
+
+                            // NOT IN
+                            query = 'SELECT * FROM `subscription__' + campaign.list + '` AS subscription WHERE status=1 ' + (queryData.where ? ' AND (' + queryData.where + ')' : '') + ' AND id NOT IN (SELECT subscription FROM `campaign__' + campaign.id + '` campaign WHERE campaign.list = ? AND campaign.segment = ? AND campaign.subscription = subscription.id) LIMIT 1000';
+                            values = queryData.values.concat([campaign.list, campaign.segment]);
+
+                            // LEFT JOIN / IS NULL
+                            //query = 'SELECT subscription.* FROM `subscription__' + campaign.list + '` AS subscription LEFT JOIN `campaign__' + campaign.id + '` AS campaign ON campaign.list = ? AND campaign.segment = ? AND campaign.subscription = subscription.id WHERE subscription.status=1 ' + (queryData.where ? 'AND (' + queryData.where + ') ' : '') + 'AND campaign.id IS NULL LIMIT 150';
+                            //values = [campaign.list, campaign.segment].concat(queryData.values);
+
+                            connection.query(query, values, (err, rows) => {
+
+                                if (err) {
+                                    connection.release();
+                                    return callback(err);
+                                }
+
+                                if (!rows || !rows.length) {
+                                    // everything already processed for this campaign
+                                    connection.query('UPDATE campaigns SET `status`=3, `status_change`=NOW() WHERE id=? AND `status`=? LIMIT 1', [campaign.id, 2], () => {
+                                        connection.release();
+                                        return callback(null);
+                                    });
+                                    return;
+                                }
+                                connection.release();
+
+                                let pos = 0;
+                                let addToCache = () => {
+                                    if (pos >= rows.length) {
+                                        return callback(null);
+                                    }
+                                    let row = rows[pos++];
+                                    db.addToCache('sender', {
+                                        row,
+                                        campaign
+                                    }, err => {
+                                        if (err) {
+                                            return callback(err);
+                                        }
+                                        setImmediate(addToCache);
+                                    });
+                                };
+
+                                addToCache();
+                            });
+                        });
+
+                    });
+                }
+
                 db.getConnection((err, connection) => {
                     if (err) {
                         return done(err);
@@ -163,87 +243,52 @@ function findUnsent(callback) {
                             return checkQueued();
                         }
 
-                        let campaign = tools.convertKeys(rows[0]);
+                        // Process ALL campaigns, not just the first one
+                        let activeCampaigns = rows.map(tools.convertKeys);
+                        let processedCount = 0;
+                        let maxConcurrent = 2; // Process 2 campaigns concurrently
+                        let running = 0;
+                        let campaignIndex = 0;
+                        let hasError = false;
 
-                        let getSegmentQuery = (segmentId, next) => {
-                            segmentId = Number(segmentId);
-                            if (!segmentId) {
-                                return next(null, {
-                                    where: '',
-                                    values: []
-                                });
+                        function processCampaign() {
+                            if (hasError) {
+                                return;
                             }
 
-                            segments.getQuery(segmentId, 'subscription', next);
-                        };
-
-                        getSegmentQuery(campaign.segment, (err, queryData) => {
-                            if (err) {
-                                return done(err);
-                            }
-
-                            db.getConnection((err, connection) => {
-                                if (err) {
-                                    return done(err);
+                            if (campaignIndex >= activeCampaigns.length) {
+                                // All campaigns queued for processing
+                                if (running === 0) {
+                                    // All campaigns finished processing
+                                    lock.release(() => {
+                                        findUnsent(callback);
+                                    });
                                 }
+                                return;
+                            }
 
-                                // TODO: Add support for localized sending time. In this case campaign messages are
-                                //       not sent before receiver's local time reaches defined time
-                                // SELECT * FROM subscription__1 LEFT JOIN tzoffset ON tzoffset.tz=subscription__1.tz WHERE NOW() + INTERVAL IFNULL(`offset`,0) MINUTE >= localtime
+                            while (running < maxConcurrent && campaignIndex < activeCampaigns.length) {
+                                let campaign = activeCampaigns[campaignIndex++];
+                                running++;
 
-                                let query;
-                                let values;
-
-                                // NOT IN
-                                query = 'SELECT * FROM `subscription__' + campaign.list + '` AS subscription WHERE status=1 ' + (queryData.where ? ' AND (' + queryData.where + ')' : '') + ' AND id NOT IN (SELECT subscription FROM `campaign__' + campaign.id + '` campaign WHERE campaign.list = ? AND campaign.segment = ? AND campaign.subscription = subscription.id) LIMIT 1000';
-                                values = queryData.values.concat([campaign.list, campaign.segment]);
-
-                                // LEFT JOIN / IS NULL
-                                //query = 'SELECT subscription.* FROM `subscription__' + campaign.list + '` AS subscription LEFT JOIN `campaign__' + campaign.id + '` AS campaign ON campaign.list = ? AND campaign.segment = ? AND campaign.subscription = subscription.id WHERE subscription.status=1 ' + (queryData.where ? 'AND (' + queryData.where + ') ' : '') + 'AND campaign.id IS NULL LIMIT 150';
-                                //values = [campaign.list, campaign.segment].concat(queryData.values);
-
-                                connection.query(query, values, (err, rows) => {
+                                handleCampaign(campaign, (err) => {
+                                    running--;
+                                    processedCount++;
 
                                     if (err) {
-                                        connection.release();
-                                        return done(err);
-                                    }
-
-                                    if (!rows || !rows.length) {
-                                        // everything already processed for this campaign
-                                        connection.query('UPDATE campaigns SET `status`=3, `status_change`=NOW() WHERE id=? AND `status`=? LIMIT 1', [campaign.id, 2], () => {
-                                            connection.release();
-                                            return done(null, false);
-                                        });
+                                        if (!hasError) {
+                                            hasError = true;
+                                            return done(err);
+                                        }
                                         return;
                                     }
-                                    connection.release();
 
-                                    let pos = 0;
-                                    let addToCache = () => {
-                                        if (pos >= rows.length) {
-                                            lock.release(() => {
-                                                findUnsent(callback);
-                                            });
-                                            return;
-                                        }
-                                        let row = rows[pos++];
-                                        db.addToCache('sender', {
-                                            row,
-                                            campaign
-                                        }, err => {
-                                            if (err) {
-                                                return done(err);
-                                            }
-                                            setImmediate(addToCache);
-                                        });
-                                    };
-
-                                    addToCache();
+                                    setImmediate(processCampaign);
                                 });
-                            });
+                            }
+                        }
 
-                        });
+                        processCampaign();
                     });
                 });
             });

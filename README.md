@@ -1,62 +1,147 @@
-# Mailtrain
+# SendMultiCamp
 
-[Mailtrain](http://mailtrain.org) is a self hosted newsletter application built on Node.js (v7+) and MySQL (v5.5+ or MariaDB).
-
-![](http://mailtrain.org/mailtrain.png)
+A modern, parallel email campaign management application built with React and Supabase. Inspired by Mailtrain, with enhanced support for sending multiple campaigns simultaneously.
 
 ## Features
 
-* Subscriber list management
-* List segmentation
-* Custom fields
-* Email templates
-* Large CSV list import files
+- **User Authentication** - Secure email/password authentication with Supabase Auth
+- **Subscriber List Management** - Create and manage multiple subscriber lists
+- **Campaign Creation** - Rich campaign editor with HTML and plain text support
+- **Parallel Campaign Sending** - Send multiple campaigns simultaneously
+- **Real-time Stats** - Track sent, opened, and clicked metrics
+- **SMTP Configuration** - Use your own SMTP server for sending emails
+- **Modern UI** - Clean, responsive interface built with React
 
-Subscribe to Mailtrain Newsletter [here](https://mailtrain.org/subscription/S18sew2wM) (uses Mailtrain obviously)
+## Tech Stack
 
-## Hardware Requirements
-* 1 vCPU
-* 1024 MB RAM
+- **Frontend**: React 19 + Vite
+- **Backend**: Supabase (PostgreSQL + Row Level Security)
+- **Authentication**: Supabase Auth
+- **Routing**: React Router DOM
+- **Styling**: CSS Modules
 
-## Quick Start - Deploy with Docker
-#### Requirements:
+## Database Schema
 
-  * [Docker](https://www.docker.com/)
-  * [Docker Compose](https://docs.docker.com/compose/)
+The application uses the following main tables:
+- `users` - User accounts linked to Supabase Auth
+- `lists` - Subscriber lists
+- `subscribers` - Email subscribers with status tracking
+- `campaigns` - Email campaigns with content and stats
+- `campaign_sends` - Individual send records with tracking
+- `email_templates` - Reusable email templates
+- `smtp_settings` - SMTP server configuration
 
-#### Steps:
-Depending on how you have configured your system and Docker you may need to prepend the commands below with `sudo`.
+All tables have Row Level Security (RLS) enabled to ensure users can only access their own data.
 
-* Download Mailtrain files using git: `git clone git://github.com/Mailtrain-org/mailtrain.git` (or download [zipped repo](https://github.com/Mailtrain-org/mailtrain/archive/master.zip)) and open Mailtrain folder `cd mailtrain`
-* Copy the file `docker-compose.override.yml.tmpl` to `docker-compose.override.yml` and modify it if you need to.
-* Bring up the stack with: `docker-compose up -d`
-* Start: `docker-compose start`
-* Open [http://localhost:3000/](http://localhost:3000/) (change the host name `localhost` to the name of the host where you are deploying the system).
-* Authenticate as user `admin` with password `test`
-* Navigate to [http://localhost:3000/settings](http://localhost:3000/settings) and update service configuration.
-* Navigate to [http://localhost:3000/users/account](http://localhost:3000/users/account) and update user information and password.
+## Getting Started
 
-## Quick Start - Manual Install (any OS that supports Node.js)
+### Prerequisites
 
-### Requirements: 
- * Mailtrain requires at least **Node.js v7**. If you want to use an older version of Node.js then you should use version v1.24 of Mailtrain. You can either download it [here](https://github.com/Mailtrain-org/mailtrain/archive/v1.24.0.zip) or if using git then run `git checkout v1.24.0` before starting it
+- Node.js 18+
+- A Supabase account and project
 
-  1. Download Mailtrain files using git: `git clone git://github.com/Mailtrain-org/mailtrain.git` (or download [zipped repo](https://github.com/Mailtrain-org/mailtrain/archive/master.zip)) and open Mailtrain folder `cd mailtrain`
-  2. Run `npm install --production` in the Mailtrain folder to install required dependencies
-  3. Copy [config/default.toml](config/default.toml) as `config/production.toml` and update MySQL and any other settings in it
-  4. Run the server `NODE_ENV=production npm start`
-  5. Open [http://localhost:3000/](http://localhost:3000/)
-  6. Authenticate as `admin`:`test`
-  7. Navigate to [http://localhost:3000/settings](http://localhost:3000/settings) and update service configuration
-  8. Navigate to [http://localhost:3000/users/account](http://localhost:3000/users/account) and update user information and password
+### Installation
 
-## Read The Docs
-For more information, please [read the docs](http://docs.mailtrain.org/).
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
+3. Create a `.env` file with your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+4. The database schema has already been applied to your Supabase project
+
+5. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000)
+
+### Building for Production
+
+```bash
+npm run build
+npm run preview
+```
+
+## Usage
+
+### Creating Your First Campaign
+
+1. **Sign Up** - Create an account using your email
+2. **Create a List** - Navigate to Lists and create a subscriber list
+3. **Add Subscribers** - Add email addresses to your list
+4. **Configure SMTP** - Go to Settings and configure your SMTP server
+5. **Create Campaign** - Create a new campaign, write your email content
+6. **Send** - Send your campaign to all active subscribers
+
+### Parallel Campaign Sending
+
+The application supports sending multiple campaigns simultaneously. The backend is designed to process campaigns in parallel using Supabase's real-time capabilities and efficient database queries.
+
+### Email Tracking
+
+Campaigns automatically track:
+- **Sent** - Total emails sent
+- **Opened** - Number of unique opens
+- **Clicked** - Number of clicks on links
+- **Bounced** - Failed deliveries
+
+## Architecture
+
+### Frontend
+
+The React application is organized as:
+- `src/pages/` - Page components (Dashboard, Lists, Campaigns, etc.)
+- `src/components/` - Reusable UI components
+- `src/lib/` - Utility functions and API client
+- CSS Modules for component-specific styling
+
+### Backend
+
+Supabase provides:
+- PostgreSQL database with migrations
+- Row Level Security for data isolation
+- Real-time subscriptions for live updates
+- Authentication and user management
+
+### Security
+
+- All database access is protected by Row Level Security (RLS)
+- Users can only access their own lists, campaigns, and subscribers
+- SMTP passwords are stored securely in the database
+- Authentication tokens are managed by Supabase Auth
+
+## API Reference
+
+The `api.js` file provides methods for:
+- `getLists()` - Fetch user's lists
+- `createList(data)` - Create a new list
+- `getSubscribers(listId)` - Get subscribers for a list
+- `addSubscriber(data)` - Add a subscriber
+- `getCampaigns()` - Fetch user's campaigns
+- `createCampaign(data)` - Create a new campaign
+- `updateCampaign(id, data)` - Update campaign
+- `sendCampaign(id)` - Send a campaign
+- `getSMTPSettings()` - Get SMTP configuration
+- `saveSMTPSettings(data)` - Save SMTP settings
+
+## Contributing
+
+This is a reference implementation inspired by Mailtrain. Feel free to fork and customize for your needs.
 
 ## License
 
-  * Versions 1.22.0 and up **GPL-V3.0**
-  * Versions 1.21.0 and up: **EUPL-1.1**
-  * Versions 1.19.0 and up: **MIT**
-  * Up to versions 1.18.0 **GPL-V3.0**
+ISC
+
+## Acknowledgments
+
+- Inspired by [Mailtrain](https://github.com/Mailtrain-org/mailtrain)
+- Built with [Supabase](https://supabase.com)
+- UI design principles from modern email marketing platforms

@@ -280,26 +280,153 @@ app.post('/api/campaigns/:id/send', authMiddleware, async (req, res) => {
 
     const campaign = campaigns[0];
 
+    const smtpServers = await query(
+      'SELECT * FROM smtp_servers WHERE user_id = ? AND is_active = ? ORDER BY emails_sent_today ASC',
+      [req.userId, true]
+    );
+
+    if (smtpServers.length === 0) {
+      return res.status(400).json({ error: 'No active SMTP servers found. Please add and activate an SMTP server first.' });
+    }
+
     const subscribers = await query(
       'SELECT * FROM subscribers WHERE list_id = ? AND status = ?',
       [campaign.list_id, 'active']
     );
 
-    await query(
-      'UPDATE campaigns SET status = ?, total_subscribers = ? WHERE id = ?',
-      ['sending', subscribers.length, id]
+    const blacklist = await query(
+      'SELECT email FROM blacklist WHERE user_id = ?',
+      [req.userId]
     );
+    const blacklistedEmails = new Set(blacklist.map(b => b.email.toLowerCase()));
 
-    for (const subscriber of subscribers) {
-      const sendId = uuidv4();
-      await query(
-        'INSERT INTO campaign_sends (id, campaign_id, subscriber_id, status) VALUES (?, ?, ?, ?)',
-        [sendId, id, subscriber.id, 'pending']
-      );
+    const unsubscribed = await query(
+      'SELECT email FROM unsubscribe_list WHERE user_id = ?',
+      [req.userId]
+    );
+    const unsubscribedEmails = new Set(unsubscribed.map(u => u.email.toLowerCase()));
+
+    const validSubscribers = subscribers.filter(sub => {
+      const email = sub.email.toLowerCase();
+      return !blacklistedEmails.has(email) && !unsubscribedEmails.has(email);
+    });
+
+    if (validSubscribers.length === 0) {
+      return res.status(400).json({ error: 'No valid subscribers to send to (all blacklisted or unsubscribed)' });
     }
 
-    res.json({ success: true, message: 'Campaign queued for sending' });
+    await query(
+      'UPDATE campaigns SET status = ?, total_subscribers = ?, sent_count = 0 WHERE id = ?',
+      ['sending', validSubscribers.length, id]
+    );
+
+    res.json({
+      success: true,
+      message: `Sending campaign to ${validSubscribers.length} subscribers...`,
+      total: validSubscribers.length
+    });
+
+    setImmediate(async () => {
+      let sentCount = 0;
+      let failedCount = 0;
+      let currentServerIndex = 0;
+
+      for (const subscriber of validSubscribers) {
+        try {
+          const server = smtpServers[currentServerIndex % smtpServers.length];
+
+          if (server.daily_limit > 0 && server.emails_sent_today >= server.daily_limit) {
+            currentServerIndex++;
+            const nextServer = smtpServers[currentServerIndex % smtpServers.length];
+            if (nextServer.daily_limit > 0 && nextServer.emails_sent_today >= nextServer.daily_limit) {
+              console.log('All SMTP servers reached daily limit');
+              break;
+            }
+            continue;
+          }
+
+          const transporter = nodemailer.createTransport({
+            host: server.host,
+            port: server.port,
+            secure: server.use_tls,
+            auth: {
+              user: server.username,
+              pass: server.password
+            }
+          });
+
+          let htmlContent = campaign.html_content || campaign.text_content || '';
+          let textContent = campaign.text_content || campaign.html_content || '';
+
+          htmlContent = htmlContent
+            .replace(/\{\{first_name\}\}/g, subscriber.first_name || '')
+            .replace(/\{\{last_name\}\}/g, subscriber.last_name || '')
+            .replace(/\{\{email\}\}/g, subscriber.email);
+
+          textContent = textContent
+            .replace(/\{\{first_name\}\}/g, subscriber.first_name || '')
+            .replace(/\{\{last_name\}\}/g, subscriber.last_name || '')
+            .replace(/\{\{email\}\}/g, subscriber.email);
+
+          const mailOptions = {
+            from: `"${campaign.from_name}" <${campaign.from_email}>`,
+            to: subscriber.email,
+            subject: campaign.subject,
+            text: textContent,
+            html: htmlContent
+          };
+
+          if (campaign.reply_to) {
+            mailOptions.replyTo = campaign.reply_to;
+          }
+
+          await transporter.sendMail(mailOptions);
+
+          const sendId = uuidv4();
+          await query(
+            'INSERT INTO campaign_sends (id, campaign_id, subscriber_id, status, sent_at) VALUES (?, ?, ?, ?, NOW())',
+            [sendId, id, subscriber.id, 'sent']
+          );
+
+          await query(
+            'UPDATE smtp_servers SET emails_sent_today = emails_sent_today + 1 WHERE id = ?',
+            [server.id]
+          );
+
+          sentCount++;
+
+          await query(
+            'UPDATE campaigns SET sent_count = ? WHERE id = ?',
+            [sentCount, id]
+          );
+
+          currentServerIndex++;
+
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+        } catch (error) {
+          console.error(`Failed to send to ${subscriber.email}:`, error.message);
+
+          const sendId = uuidv4();
+          await query(
+            'INSERT INTO campaign_sends (id, campaign_id, subscriber_id, status, error_message) VALUES (?, ?, ?, ?, ?)',
+            [sendId, id, subscriber.id, 'failed', error.message]
+          );
+
+          failedCount++;
+        }
+      }
+
+      await query(
+        'UPDATE campaigns SET status = ?, sent_count = ?, sent_at = NOW() WHERE id = ?',
+        ['sent', sentCount, id]
+      );
+
+      console.log(`Campaign ${id} completed: ${sentCount} sent, ${failedCount} failed`);
+    });
+
   } catch (error) {
+    console.error('Campaign send error:', error);
     res.status(500).json({ error: error.message });
   }
 });

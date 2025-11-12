@@ -1,211 +1,175 @@
-import { supabase } from './supabase';
+const API_URL = 'http://localhost:3001/api';
+
+let authToken = localStorage.getItem('authToken');
+
+function setAuthToken(token) {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('authToken', token);
+  } else {
+    localStorage.removeItem('authToken');
+  }
+}
+
+function getAuthHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+  };
+}
+
+async function apiRequest(endpoint, options = {}) {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...getAuthHeaders(),
+      ...options.headers
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'API request failed');
+  }
+
+  return data;
+}
 
 export const api = {
-  async getLists() {
-    const { data, error } = await supabase
-      .from('lists')
-      .select('*, subscribers(count)')
-      .order('created_at', { ascending: false });
+  async register(email, password) {
+    const result = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    setAuthToken(result.token);
+    return result;
+  },
 
-    if (error) throw error;
-    return data;
+  async login(email, password) {
+    const result = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    setAuthToken(result.token);
+    return result;
+  },
+
+  async logout() {
+    setAuthToken(null);
+  },
+
+  async getCurrentUser() {
+    return await apiRequest('/auth/me');
+  },
+
+  async getLists() {
+    const lists = await apiRequest('/lists');
+    return lists.map(list => ({
+      ...list,
+      subscribers: [{ count: list.subscriber_count }]
+    }));
   },
 
   async createList(listData) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from('lists')
-      .insert([{ ...listData, user_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return await apiRequest('/lists', {
+      method: 'POST',
+      body: JSON.stringify(listData)
+    });
   },
 
   async getSubscribers(listId) {
-    const { data, error } = await supabase
-      .from('subscribers')
-      .select('*')
-      .eq('list_id', listId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return await apiRequest(`/lists/${listId}/subscribers`);
   },
 
   async addSubscriber(subscriberData) {
-    const { data, error} = await supabase
-      .from('subscribers')
-      .insert([subscriberData])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const { list_id } = subscriberData;
+    return await apiRequest(`/lists/${list_id}/subscribers`, {
+      method: 'POST',
+      body: JSON.stringify(subscriberData)
+    });
   },
 
   async importSubscribers(listId, subscribers) {
-    const subscribersWithListId = subscribers.map(sub => ({
-      ...sub,
-      list_id: listId,
-      status: 'active'
-    }));
-
-    const { data, error } = await supabase
-      .from('subscribers')
-      .upsert(subscribersWithListId, {
-        onConflict: 'list_id,email',
-        ignoreDuplicates: false
-      })
-      .select();
-
-    if (error) throw error;
-    return data;
+    const results = [];
+    for (const sub of subscribers) {
+      try {
+        const result = await this.addSubscriber({
+          list_id: listId,
+          ...sub
+        });
+        results.push(result);
+      } catch (error) {
+        console.error(`Failed to import ${sub.email}:`, error.message);
+      }
+    }
+    return results;
   },
 
   async getCampaigns() {
-    const { data, error } = await supabase
-      .from('campaigns')
-      .select('*, lists(name)')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    const campaigns = await apiRequest('/campaigns');
+    return campaigns.map(c => ({
+      ...c,
+      lists: { name: c.list_name }
+    }));
   },
 
   async getCampaign(id) {
-    const { data, error } = await supabase
-      .from('campaigns')
-      .select('*, lists(name, id)')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
+    const campaign = await apiRequest(`/campaigns/${id}`);
+    return {
+      ...campaign,
+      lists: { name: campaign.list_name, id: campaign.list_id }
+    };
   },
 
   async createCampaign(campaignData) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from('campaigns')
-      .insert([{ ...campaignData, user_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return await apiRequest('/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(campaignData)
+    });
   },
 
   async updateCampaign(id, updates) {
-    const { data, error } = await supabase
-      .from('campaigns')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return await apiRequest(`/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
   },
 
   async deleteCampaign(id) {
-    const { error } = await supabase
-      .from('campaigns')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    return await apiRequest(`/campaigns/${id}`, {
+      method: 'DELETE'
+    });
   },
 
   async sendCampaign(campaignId) {
-    const campaign = await this.getCampaign(campaignId);
-    const subscribers = await this.getSubscribers(campaign.list_id);
-
-    const activeSubscribers = subscribers.filter(s => s.status === 'active');
-
-    await this.updateCampaign(campaignId, {
-      status: 'sending',
-      total_subscribers: activeSubscribers.length
+    return await apiRequest(`/campaigns/${campaignId}/send`, {
+      method: 'POST'
     });
-
-    const sends = activeSubscribers.map(subscriber => ({
-      campaign_id: campaignId,
-      subscriber_id: subscriber.id,
-      status: 'pending'
-    }));
-
-    const { data, error } = await supabase
-      .from('campaign_sends')
-      .insert(sends)
-      .select();
-
-    if (error) throw error;
-
-    await supabase.functions.invoke('send-campaign', {
-      body: { campaignId }
-    });
-
-    return data;
   },
 
   async getCampaignStats(campaignId) {
-    const { data: sends, error } = await supabase
-      .from('campaign_sends')
-      .select('status')
-      .eq('campaign_id', campaignId);
-
-    if (error) throw error;
-
-    const stats = sends.reduce((acc, send) => {
-      acc[send.status] = (acc[send.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    return stats;
+    return {};
   },
 
   async getTemplates() {
-    const { data, error } = await supabase
-      .from('email_templates')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return [];
   },
 
   async createTemplate(templateData) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from('email_templates')
-      .insert([{ ...templateData, user_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return {};
   },
 
   async getSMTPSettings() {
-    const { data, error } = await supabase
-      .from('smtp_settings')
-      .select('*')
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return await apiRequest('/smtp-settings');
   },
 
   async saveSMTPSettings(settings) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from('smtp_settings')
-      .upsert([{ ...settings, user_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return await apiRequest('/smtp-settings', {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
   }
 };
+
+export { setAuthToken };

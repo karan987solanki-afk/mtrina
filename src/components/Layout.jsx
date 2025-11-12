@@ -1,14 +1,11 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { Link, useLocation } from 'react-router-dom';
 import styles from './Layout.module.css';
 
-export default function Layout({ children }) {
-  const navigate = useNavigate();
+export default function Layout({ children, onLogout }) {
   const location = useLocation();
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+  const handleSignOut = () => {
+    onLogout();
   };
 
   const isActive = (path) => location.pathname === path;

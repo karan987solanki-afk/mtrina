@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 import styles from './Login.module.css';
 
-export default function Login() {
+export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,27 +16,11 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          await supabase.from('users').insert([
-            { id: data.user.id, email: data.user.email }
-          ]);
-
-          setMessage('Check your email for confirmation link');
-        }
+        const result = await api.register(email, password);
+        onLogin(result.user);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
+        const result = await api.login(email, password);
+        onLogin(result.user);
       }
     } catch (error) {
       setMessage(error.message);

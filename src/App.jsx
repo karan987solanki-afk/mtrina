@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './lib/supabase';
+import { api } from './lib/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Lists from './pages/Lists';
@@ -10,23 +10,32 @@ import Settings from './pages/Settings';
 import Layout from './components/Layout';
 
 function App() {
-  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const userData = await api.getCurrentUser();
+        setUser(userData.user);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      localStorage.removeItem('authToken');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await api.logout();
+    setUser(null);
+  };
 
   if (loading) {
     return (
@@ -41,12 +50,12 @@ function App() {
     );
   }
 
-  if (!session) {
-    return <Login />;
+  if (!user) {
+    return <Login onLogin={setUser} />;
   }
 
   return (
-    <Layout>
+    <Layout onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/lists" element={<Lists />} />

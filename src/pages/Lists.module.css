@@ -50,6 +50,230 @@
   color: #999;
 }
 
+.cardActions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.secondaryButton {
+  padding: 0.5rem 1rem;
+  background: white;
+  color: #007bff;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.secondaryButton:hover {
+  background: #f0f8ff;
+}
+
+.importButton {
+  padding: 0.5rem 1rem;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.importButton:hover {
+  background: #218838;
+}
+
+.subscriberList {
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+}
+
+.table tr:hover {
+  background: #f8f9fa;
+}
+
+.statusactive {
+  padding: 0.25rem 0.5rem;
+  background: #d4edda;
+  color: #155724;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.statusunsubscribed {
+  padding: 0.25rem 0.5rem;
+  background: #f8d7da;
+  color: #721c24;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.statusbounced {
+  padding: 0.25rem 0.5rem;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.addForm input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.addForm div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.importSection {
+  margin-bottom: 1.5rem;
+}
+
+.importSection h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.importSection p {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.fileInput {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px dashed #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.fileInput:hover {
+  border-color: #007bff;
+}
+
+.fieldMapping {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.mappingRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mappingRow label {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.mappingRow select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+.previewSection {
+  margin-top: 1.5rem;
+}
+
+.previewSection h4 {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #666;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 0.5rem;
+  text-align: left;
+  border: 1px solid #e0e0e0;
+}
+
+.previewTable th {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.progressSection {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 24px;
+  background: #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0.75rem 0;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.progressSection p {
+  margin: 0.5rem 0 0 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .modal {
   position: fixed;
   top: 0;

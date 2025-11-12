@@ -195,6 +195,13 @@ export const api = {
     });
   },
 
+  async testSMTPServer(id, toEmail) {
+    return await apiRequest(`/smtp-servers/${id}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ to_email: toEmail })
+    });
+  },
+
   async getBlacklist() {
     return await apiRequest('/blacklist');
   },

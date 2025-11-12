@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const { query, testConnection } = require('./db');
@@ -541,6 +542,77 @@ app.post('/api/campaigns/:id/duplicate', authMiddleware, async (req, res) => {
     res.json(newCampaigns[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Test email endpoint
+app.post('/api/smtp-servers/:id/test', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { to_email } = req.body;
+
+    if (!to_email) {
+      return res.status(400).json({ error: 'Email address required' });
+    }
+
+    const servers = await query(
+      'SELECT * FROM smtp_servers WHERE id = ? AND user_id = ?',
+      [id, req.userId]
+    );
+
+    if (servers.length === 0) {
+      return res.status(404).json({ error: 'SMTP server not found' });
+    }
+
+    const server = servers[0];
+
+    const transporter = nodemailer.createTransport({
+      host: server.host,
+      port: server.port,
+      secure: server.use_tls,
+      auth: {
+        user: server.username,
+        pass: server.password
+      }
+    });
+
+    await transporter.verify();
+
+    const info = await transporter.sendMail({
+      from: `"${server.name}" <${server.username}>`,
+      to: to_email,
+      subject: 'Test Email from SendMultiCamp',
+      text: `This is a test email sent from SendMultiCamp using SMTP server: ${server.name}\n\nServer Details:\nHost: ${server.host}\nPort: ${server.port}\nTLS: ${server.use_tls ? 'Enabled' : 'Disabled'}\n\nIf you received this email, your SMTP configuration is working correctly!`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #667eea;">Test Email from SendMultiCamp</h2>
+          <p>This is a test email sent from SendMultiCamp using SMTP server: <strong>${server.name}</strong></p>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Server Details:</h3>
+            <p style="margin: 5px 0;"><strong>Host:</strong> ${server.host}</p>
+            <p style="margin: 5px 0;"><strong>Port:</strong> ${server.port}</p>
+            <p style="margin: 5px 0;"><strong>TLS:</strong> ${server.use_tls ? 'Enabled' : 'Disabled'}</p>
+          </div>
+          <p style="color: #28a745;">✅ If you received this email, your SMTP configuration is working correctly!</p>
+          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+          <p style="color: #666; font-size: 12px;">Sent by SendMultiCamp Email Campaign Manager</p>
+        </div>
+      `
+    });
+
+    console.log('Test email sent:', info.messageId);
+
+    res.json({
+      success: true,
+      message: 'Test email sent successfully!',
+      messageId: info.messageId
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 

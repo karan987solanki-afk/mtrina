@@ -6,6 +6,10 @@ export default function SMTPServers() {
   const [servers, setServers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingServer, setEditingServer] = useState(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testingServer, setTestingServer] = useState(null);
+  const [testEmail, setTestEmail] = useState('');
+  const [testingInProgress, setTestingInProgress] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     host: '',
@@ -94,6 +98,27 @@ export default function SMTPServers() {
     });
   };
 
+  const handleTestEmail = async (e) => {
+    e.preventDefault();
+    setTestingInProgress(true);
+    try {
+      const result = await api.testSMTPServer(testingServer.id, testEmail);
+      alert(`✅ ${result.message}\n\nMessage ID: ${result.messageId}\n\nCheck your inbox at ${testEmail}`);
+      setShowTestModal(false);
+      setTestEmail('');
+      setTestingServer(null);
+    } catch (error) {
+      alert(`❌ Test email failed!\n\n${error.message}`);
+    } finally {
+      setTestingInProgress(false);
+    }
+  };
+
+  const openTestModal = (server) => {
+    setTestingServer(server);
+    setShowTestModal(true);
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -149,6 +174,13 @@ export default function SMTPServers() {
               </div>
 
               <div className={styles.serverActions}>
+                <button
+                  onClick={() => openTestModal(server)}
+                  className={styles.testButton}
+                  title="Send test email"
+                >
+                  Test Email
+                </button>
                 <button
                   onClick={() => toggleActive(server)}
                   className={styles.toggleButton}
@@ -278,6 +310,47 @@ export default function SMTPServers() {
                   Cancel
                 </button>
                 <button type="submit">{editingServer ? 'Update' : 'Add'} Server</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showTestModal && testingServer && (
+        <div className={styles.modal}>
+          <div className={styles.modalContent} style={{ maxWidth: '500px' }}>
+            <h2>Send Test Email</h2>
+            <p>Server: <strong>{testingServer.name}</strong></p>
+
+            <form onSubmit={handleTestEmail}>
+              <div className={styles.formGroup}>
+                <label>Send test email to: *</label>
+                <input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  autoFocus
+                />
+                <small>A test email will be sent to verify your SMTP configuration</small>
+              </div>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTestModal(false);
+                    setTestEmail('');
+                    setTestingServer(null);
+                  }}
+                  disabled={testingInProgress}
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={testingInProgress}>
+                  {testingInProgress ? 'Sending...' : 'Send Test Email'}
+                </button>
               </div>
             </form>
           </div>

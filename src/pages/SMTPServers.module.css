@@ -138,6 +138,15 @@
   transition: all 0.2s;
 }
 
+.testButton {
+  background: #ffc107;
+  color: #333;
+}
+
+.testButton:hover {
+  background: #e0a800;
+}
+
 .toggleButton {
   background: #007bff;
   color: white;

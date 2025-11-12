@@ -35,6 +35,18 @@ export default function Layout({ children, onLogout }) {
             Campaigns
           </Link>
           <Link
+            to="/smtp-servers"
+            className={`${styles.navItem} ${isActive('/smtp-servers') ? styles.active : ''}`}
+          >
+            SMTP Servers
+          </Link>
+          <Link
+            to="/email-filters"
+            className={`${styles.navItem} ${isActive('/email-filters') ? styles.active : ''}`}
+          >
+            Email Filters
+          </Link>
+          <Link
             to="/settings"
             className={`${styles.navItem} ${isActive('/settings') ? styles.active : ''}`}
           >

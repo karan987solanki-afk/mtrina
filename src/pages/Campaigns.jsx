@@ -46,6 +46,17 @@ export default function Campaigns() {
     }
   };
 
+  const handleDuplicate = async (campaignId) => {
+    try {
+      await api.duplicateCampaign(campaignId);
+      alert('Campaign duplicated successfully!');
+      loadCampaigns();
+    } catch (error) {
+      console.error('Error duplicating campaign:', error);
+      alert('Failed to duplicate campaign');
+    }
+  };
+
   if (loading) {
     return <div className={styles.loading}>Loading campaigns...</div>;
   }
@@ -113,6 +124,13 @@ export default function Campaigns() {
                     </button>
                   </>
                 )}
+                <button
+                  onClick={() => handleDuplicate(campaign.id)}
+                  className={`${styles.actionButton} ${styles.copy}`}
+                  title="Duplicate this campaign"
+                >
+                  Copy
+                </button>
                 <button
                   onClick={() => handleDelete(campaign.id)}
                   className={`${styles.actionButton} ${styles.danger}`}

@@ -133,6 +133,15 @@
   color: #721c24;
 }
 
+.actionButton.copy {
+  background: #17a2b8;
+  color: white;
+}
+
+.actionButton.copy:hover {
+  background: #138496;
+}
+
 .empty {
   text-align: center;
   padding: 4rem;

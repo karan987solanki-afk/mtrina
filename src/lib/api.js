@@ -169,6 +169,70 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(settings)
     });
+  },
+
+  async getSMTPServers() {
+    return await apiRequest('/smtp-servers');
+  },
+
+  async createSMTPServer(server) {
+    return await apiRequest('/smtp-servers', {
+      method: 'POST',
+      body: JSON.stringify(server)
+    });
+  },
+
+  async updateSMTPServer(id, updates) {
+    return await apiRequest(`/smtp-servers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  },
+
+  async deleteSMTPServer(id) {
+    return await apiRequest(`/smtp-servers/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async getBlacklist() {
+    return await apiRequest('/blacklist');
+  },
+
+  async addToBlacklist(email, reason) {
+    return await apiRequest('/blacklist', {
+      method: 'POST',
+      body: JSON.stringify({ email, reason })
+    });
+  },
+
+  async removeFromBlacklist(id) {
+    return await apiRequest(`/blacklist/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async getUnsubscribeList() {
+    return await apiRequest('/unsubscribe-list');
+  },
+
+  async addToUnsubscribeList(email, list_id, campaign_id, reason) {
+    return await apiRequest('/unsubscribe-list', {
+      method: 'POST',
+      body: JSON.stringify({ email, list_id, campaign_id, reason })
+    });
+  },
+
+  async removeFromUnsubscribeList(id) {
+    return await apiRequest(`/unsubscribe-list/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async duplicateCampaign(campaignId) {
+    return await apiRequest(`/campaigns/${campaignId}/duplicate`, {
+      method: 'POST'
+    });
   }
 };
 

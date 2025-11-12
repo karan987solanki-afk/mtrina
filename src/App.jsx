@@ -7,6 +7,8 @@ import Lists from './pages/Lists';
 import Campaigns from './pages/Campaigns';
 import CampaignEditor from './pages/CampaignEditor';
 import Settings from './pages/Settings';
+import SMTPServers from './pages/SMTPServers';
+import EmailFilters from './pages/EmailFilters';
 import Layout from './components/Layout';
 
 function App() {
@@ -62,6 +64,8 @@ function App() {
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/campaigns/new" element={<CampaignEditor />} />
         <Route path="/campaigns/:id/edit" element={<CampaignEditor />} />
+        <Route path="/smtp-servers" element={<SMTPServers />} />
+        <Route path="/email-filters" element={<EmailFilters />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
